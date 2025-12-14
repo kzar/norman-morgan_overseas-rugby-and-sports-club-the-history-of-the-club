@@ -22,3 +22,12 @@ p.h4 + p {
   hanging-punctuation: first last;
   text-indent: 0;
 }
+
+/* Signatures */
+p.signature {
+  break-inside: avoid;
+  font-style: italic;
+  margin-top: 1.5em;
+  text-align: right;
+  text-indent: 0;
+}
