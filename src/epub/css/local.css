@@ -1,6 +1,24 @@
 @charset "utf-8";
 @namespace epub "http://www.idpf.org/2007/ops";
 
+/* Display heading on colophon page */
 section[epub|type~="colophon"] h2 {
   position: initial;
+}
+
+/* Blockquote headings */
+blockquote header p, p.h4 {
+  break-after: avoid;
+  break-inside: avoid;
+  margin-bottom: 0.5em;
+  font-variant: small-caps;
+  font-weight: bold;
+  hyphens: none;
+  -epub-hyphens: none;
+  text-align: center;
+  text-indent: 0;
+}
+p.h4 + p {
+  hanging-punctuation: first last;
+  text-indent: 0;
 }
