@@ -31,3 +31,7 @@ p.signature {
   text-align: right;
   text-indent: 0;
 }
+
+#bar-takings-statement > tbody th {
+  text-align: left;
+}
