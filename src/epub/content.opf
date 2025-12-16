@@ -17,17 +17,18 @@
 		<meta property="role" refines="#type-designer" scheme="marc:relators">tyd</meta>
 		<dc:title id="title">Overseas Rugby and Sports Club - The History of the Club</dc:title>
 		<meta property="file-as" refines="#title">Overseas Rugby and Sports Club - The History of the Club</meta>
-		<dc:subject id="subject-1">Rugby football -- Malta -- History</dc:subject>
-		<dc:subject id="subject-2">Athletic clubs -- Malta -- History</dc:subject>
-		<dc:subject id="subject-3">Malta -- Armed Forces -- British -- History</dc:subject>
+		<dc:subject id="subject-1">Rugby football -- Clubs</dc:subject>
+		<dc:subject id="subject-2">Rugby football -- History</dc:subject>
+		<dc:subject id="subject-3">Malta -- History</dc:subject>
+		<dc:subject id="subject-4">Great Britain -- History, Military -- 20th century</dc:subject>
 		<meta property="authority" refines="#subject-1">LCSH</meta>
-		<meta property="term" refines="#subject-1">sh85115741</meta>
+		<meta property="term" refines="#subject-1">sh85115743</meta>
 		<meta property="authority" refines="#subject-2">LCSH</meta>
-		<meta property="term" refines="#subject-2">sh85009141</meta>
+		<meta property="term" refines="#subject-2">sh2010111500</meta>
 		<meta property="authority" refines="#subject-3">LCSH</meta>
-		<meta property="term" refines="#subject-3">sh2002010260</meta>
+		<meta property="term" refines="#subject-3">sh85080202</meta>
 		<meta property="authority" refines="#subject-4">LCSH</meta>
-		<meta property="term" refines="#subject-4">sh85080213</meta>
+		<meta property="term" refines="#subject-4">sh85056842</meta>
 		<meta property="se:subject">Rugby</meta>
 		<dc:description id="description">The history of the Overseas Rugby and Sports Club in Malta, from its formation in 1946 through to 1982.</dc:description>
 		<meta id="long-description" property="se:long-description" refines="#description">Founded in 1946 by Commodore D. Orr-Ewing and Trevor Lewis, the Overseas Rugby Football Club was the only civilian rugby club in Malta for many years. This history chronicles the club's development from its post-war inception, through the golden years of matches against Royal Navy ships and touring sides, to the challenges faced during the British Forces withdrawal. It includes detailed records of officials, match results, and the social life that made the club a central hub for sportsmen on the island.</meta>
