@@ -24,6 +24,16 @@ p.h4 + p {
   text-indent: 0;
 }
 
+header.letter > p:first-of-type {
+  text-align: right;
+}
+header.letter > p {
+  text-align: left;
+}
+header.letter {
+  margin-bottom: 1em;
+}
+
 /* Signatures */
 p.signature {
   break-inside: avoid;
