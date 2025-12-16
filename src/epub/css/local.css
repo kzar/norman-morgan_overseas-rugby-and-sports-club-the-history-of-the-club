@@ -3,11 +3,12 @@
 
 /* Display heading on colophon page */
 section[epub|type~="colophon"] h2 {
-  position: initial;
+  position: static;
+  font-size: 1.2em;
 }
 
 /* Blockquote headings */
-blockquote header p, p.h4 {
+p.h4 {
   break-after: avoid;
   break-inside: avoid;
   margin-bottom: 0.5em;
