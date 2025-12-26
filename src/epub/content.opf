@@ -39,8 +39,8 @@
 		<meta property="se:url.encyclopedia.wikipedia">https://en.wikipedia.org/wiki/Overseas_RUFC</meta>
 		<meta property="se:url.vcs.github">https://github.com/kzar/norman-morgan_overseas-rugby-and-sports-club-the-history-of-the-club</meta>
 		<dc:creator id="author">Norman Morgan</dc:creator>
-		<meta property="file-as" refines="#author">Morgan, Norman</meta>
-		<meta property="se:name.person.full-name" refines="#author">Morgan, Norman</meta>
+		<meta property="file-as" refines="#author">Morgan, Norman Canning</meta>
+		<meta property="se:name.person.full-name" refines="#author">Norman Canning Morgan</meta>
 		<meta property="role" refines="#author" scheme="marc:relators">aut</meta>
 		<dc:contributor id="artist">M. Holland</dc:contributor>
 		<meta property="file-as" refines="#artist">Holland, M.</meta>
