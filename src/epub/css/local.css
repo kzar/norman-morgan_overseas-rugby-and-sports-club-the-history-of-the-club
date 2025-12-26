@@ -2,108 +2,113 @@
 @namespace epub "http://www.idpf.org/2007/ops";
 
 /* Center the cover page */
-#cover {
-  text-align: center;
+#cover{
+	text-align: center;
 }
 
 /* Display heading on colophon page */
-section[epub|type~="colophon"] h2 {
-  position: static;
-  font-size: 1.2em;
+section[epub|type~="colophon"] h2{
+	font-size: 1.2em;
+	position: static;
 }
 
 /* Blockquote headings */
-p.h4 {
-  break-after: avoid;
-  break-inside: avoid;
-  margin-bottom: 0.5em;
-  font-variant: small-caps;
-  font-weight: bold;
-  hyphens: none;
-  -epub-hyphens: none;
-  text-align: center;
-  text-indent: 0;
-}
-p.h4 + p {
-  hanging-punctuation: first last;
-  text-indent: 0;
+p.h4{
+	break-after: avoid;
+	break-inside: avoid;
+	font-variant: small-caps;
+	font-weight: bold;
+	hyphens: none;
+	-epub-hyphens: none;
+	margin-bottom: .5em;
+	text-align: center;
+	text-indent: 0;
 }
 
-header.letter > p:first-of-type {
-  text-align: right;
+p.h4 + p{
+	hanging-punctuation: first last;
+	text-indent: 0;
 }
-header.letter > p {
-  text-align: left;
+
+header.letter > p:first-of-type{
+	text-align: right;
 }
-header.letter {
-  margin-bottom: 1em;
+
+header.letter > p{
+	text-align: left;
+}
+
+header.letter{
+	margin-bottom: 1em;
 }
 
 /* Signatures */
-p.signature {
-  break-inside: avoid;
-  font-style: italic;
-  margin-top: 1.5em;
-  text-align: right;
-  text-indent: 0;
+p.signature{
+	break-inside: avoid;
+	font-style: italic;
+	margin-top: 1.5em;
+	text-align: right;
+	text-indent: 0;
 }
 
-#bar-takings-statement > tbody th {
-  text-align: left;
+#bar-takings-statement > tbody th{
+	text-align: left;
 }
 
 /* Tables */
-table {
-  border-collapse: collapse;
-  margin: 1.5em 0;
-  width: 100%;
+table{
+	border-collapse: collapse;
+	margin: 1.5em 0;
+	width: 100%;
 }
 
-tbody th {
-  background-color: transparent;
+tbody th{
+	background-color: transparent;
 }
 
-th, td {
-  padding: 0.5em 0.25em;
-  vertical-align: top;
-  text-align: left;
+th,
+td{
+	padding: .5em .25em;
+	text-align: left;
+	vertical-align: top;
 }
 
-td > ul {
-  list-style-type: none;
-  padding: 0;
-  margin: 0;
+td > ul{
+	list-style-type: none;
+	margin: 0;
+	padding: 0;
 }
 
-caption {
-  caption-side: top;
-  text-align: right;
-  font-style: italic;
-  margin-bottom: 0.5em;
-  background: transparent;
+caption{
+	background: transparent;
+	caption-side: top;
+	font-style: italic;
+	margin-bottom: .5em;
+	text-align: right;
 }
 
-tr:nth-child(even) {
-  background-color: #e0e0e0;
+tr:nth-child(even){
+	background-color: #e0e0e0;
 }
 
-@media (prefers-color-scheme: dark) {
-  tr:nth-child(even) {
-    background-color: #333333;
-  }
-}
-blockquote tr:nth-child(even) {
-  background-color: transparent;
+@media(prefers-color-scheme: dark){
+	tr:nth-child(even){
+		background-color: #333333;
+	}
 }
 
-table.elected-officials th {
-  width: 40%;
-  padding-right: 1em;
-  text-align: left;
-  vertical-align: top;
+blockquote tr:nth-child(even){
+	background-color: transparent;
+}
+
+table.elected-officials th{
+	padding-right: 1em;
+	text-align: left;
+	vertical-align: top;
+	width: 40%;
 }
 
 table.playing-record th,
-table.playing-record td {
-  text-align: center;
+table.playing-record td{
+	text-align: center;
 }
