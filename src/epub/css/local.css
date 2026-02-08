@@ -112,3 +112,8 @@ table.playing-record th,
 table.playing-record td{
 	text-align: center;
 }
+
+/* Text formatting */
+[epub|type~="z3998:acronym"]{
+	font-variant: all-small-caps;
+}
