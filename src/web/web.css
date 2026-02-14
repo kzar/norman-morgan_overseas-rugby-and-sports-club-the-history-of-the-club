@@ -1,0 +1,175 @@
+/*
+ * Standard Ebooks web stylesheet (CC0 1.0)
+ * https://github.com/standardebooks/web/blob/master/www/css/web.css
+ */
+@namespace epub "http://www.idpf.org/2007/ops";
+
+body{
+	display: flex;
+	flex-direction: column;
+	font-family: "Georgia", serif;
+	font-size: 18px;
+	margin: 0;
+	min-height: 100vh;
+	line-height: 1.5;
+}
+
+main{
+	flex-grow: 1;
+	margin: 5rem auto 3rem;
+	max-width: 55ch;
+	padding: 0 3rem;
+	width: calc(100% - 2 * 3rem); /* calc instead of box-sizing: border-box which would make max-width count padding */
+}
+
+body > header{
+	all: unset; /* Remove any properties set by selectors in the ebook itself */
+	background: #fff;
+	border-bottom: 1px solid #999;
+	box-shadow: 0 0 3px #ccc;
+	left: 0;
+	position: absolute;
+	right: 0;
+	top: 0;
+	z-index: 1000; /* Required so that SVGs don't scroll over the header */
+}
+
+body > header ul{
+	align-items: center;
+	display: flex;
+	list-style: none;
+	margin: 0;
+	padding: 1em;
+	gap: 1.5em;
+}
+
+body > header li:first-child{
+	margin-right: auto;
+}
+
+body > header li:first-child > a{
+	background: no-repeat center / 100% url("/images/logo-full.svg");
+	display: block;
+	font-size: 0;
+	height: 42px;
+	transition: transform 200ms ease;
+	width: 180px;
+}
+
+body > header li:first-child > a:hover{
+	transform: scale(1.025) rotate(1deg);
+}
+
+body > footer ul{
+	display: flex;
+	justify-content: space-between;
+	list-style: none;
+	margin: 0;
+	padding: 0.5em 1em;
+}
+
+body > footer li{
+	max-width: 40%;
+}
+
+body > main > section[epub|type~="titlepage"],
+body > main > section[epub|type~="halftitlepage"]{
+	min-height: auto;
+}
+
+nav + section,
+section + nav,
+section + section,
+section + article,
+article + section,
+article + article{
+	box-sizing: border-box;
+	margin-top: 12em !important;
+	padding: 0;
+}
+
+nav[epub|type~="toc"] ol{
+	list-style: none;
+}
+
+@media(max-width: 65ch){
+	main{
+		padding: 0 2rem;
+		width: calc(100% - 2 * 2rem);
+	}
+
+	section[epub|type~="imprint"] p{
+		width: 100%;
+	}
+}
+
+@media(max-width: 450px){
+	body > header > nav > ul{
+		flex-wrap: wrap;
+	}
+
+	body > header > nav > ul > li > a{
+		font-size: .8rem;
+	}
+
+	body > header li:first-child > a{
+		background: no-repeat center / 100% url("/images/logo-small.svg");
+		width: 31px;
+		height: 20px;
+	}
+}
+
+@media(prefers-color-scheme: dark){
+	body,
+	body > header{
+		background: #222222;
+		color: #ffffff;
+	}
+
+	/* These three link colors provide WCAG AAA compliance at 16px */
+	a:link{
+		color: #6bb9f0;
+	}
+
+	a:active{
+		color: #e6cc22;
+	}
+
+	a:visited{
+		color: #dda0dd;
+	}
+
+	body > header li:first-child > a,
+	img[epub|type~="se:image.color-depth.black-on-transparent"]{
+		filter: invert(1);
+	}
+}
+
+/* As of July 2022 Chrome on Android doesn't yet understand `or (pointer: none)`
+and will just drop this entire query together if it's included. */
+@media(pointer: coarse){
+	body > header{
+		position: fixed;
+	}
+
+	body > header li:first-child > a{
+		height: 21px;
+		width: 90px;
+	}
+
+	nav[epub|type~="toc"] ol li{
+		margin-bottom: 2em;
+		margin-top: 2em;
+	}
+
+	*:target{
+		scroll-margin-top: 4em;
+	}
+}
+
+@media((max-width: 450px) and (pointer: coarse)){
+	body > header li:first-child > a{
+		width: 31px;
+		height: 20px;
+	}
+}

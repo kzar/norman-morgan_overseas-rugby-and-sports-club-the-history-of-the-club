@@ -1,0 +1,468 @@
+#!/usr/bin/env python3
+"""Build release-ready ebook outputs for this repository.
+
+Based on Standard Ebooks tooling and deployment workflow:
+- https://github.com/standardebooks/tools
+- https://github.com/standardebooks/web/blob/master/scripts/deploy-ebook-to-www
+"""
+
+from __future__ import annotations
+
+import argparse
+import html
+import re
+import shlex
+import shutil
+import subprocess
+import tempfile
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from pathlib import Path
+
+
+OPF_NS = {
+    "opf": "http://www.idpf.org/2007/opf",
+    "dc": "http://purl.org/dc/elements/1.1/",
+}
+
+JUNK_FILE_PATTERNS = ("*~", ".#*", "#*#")
+EBOOK_FILENAME_PATTERN = re.compile(r"^https__kzar-co-uk_ebooks_(.+)$")
+
+TITLE_RE = re.compile(r"<title>(.*?)</title>", re.DOTALL)
+BODY_RE = re.compile(r"<body([^>]*)>", re.DOTALL)
+MAIN_TAG_RE = re.compile(r"<main\b")
+
+
+@dataclass(frozen=True)
+class BookMetadata:
+    work_title: str
+    book_url: str | None
+    spine_text_files: list[str]
+
+
+def info(message: str) -> None:
+    print(message, flush=True)
+
+
+def run_command(command: list[str], cwd: Path, description: str) -> None:
+    info(description + ":")
+    info(f"  {' '.join(shlex.quote(part) for part in command)}")
+    subprocess.run(command, cwd=str(cwd), check=True)
+
+
+def clear_junk_files(source_dir: Path) -> None:
+    artifacts: set[Path] = set()
+    for pattern in JUNK_FILE_PATTERNS:
+        for path in source_dir.rglob(pattern):
+            if not path.is_file():
+                continue
+            relative_parts = path.relative_to(source_dir).parts
+            if ".git" in relative_parts:
+                continue
+            artifacts.add(path)
+
+    if not artifacts:
+        return
+
+    for artifact in sorted(artifacts):
+        artifact.unlink()
+
+    info(f"Removed {len(artifacts)} junk artifact(s).")
+
+
+def parse_book_metadata(source_dir: Path) -> BookMetadata:
+    content_opf = source_dir / "src" / "epub" / "content.opf"
+    tree = ET.parse(content_opf)
+    root = tree.getroot()
+
+    work_title = (
+        root.findtext(".//dc:title[@id='title']", namespaces=OPF_NS)
+        or root.findtext(".//dc:title", namespaces=OPF_NS)
+        or "Untitled"
+    ).strip()
+
+    raw_identifier = (
+        root.findtext(".//dc:identifier[@id='uid']", namespaces=OPF_NS)
+        or root.findtext(".//dc:identifier", namespaces=OPF_NS)
+        or ""
+    ).strip()
+
+    if raw_identifier.startswith("http://") or raw_identifier.startswith("https://"):
+        book_url = raw_identifier.rstrip("/")
+    else:
+        book_url = None
+
+    manifest_by_id: dict[str, str] = {}
+    for item in root.findall(".//opf:manifest/opf:item", OPF_NS):
+        item_id = item.get("id")
+        href = item.get("href")
+        if item_id and href:
+            manifest_by_id[item_id] = href
+
+    spine_text_files: list[str] = []
+    for item_ref in root.findall(".//opf:spine/opf:itemref", OPF_NS):
+        item_id = item_ref.get("idref")
+        if not item_id:
+            continue
+        href = manifest_by_id.get(item_id)
+        if not href:
+            continue
+        if href.startswith("text/") and href.endswith(".xhtml"):
+            spine_text_files.append(Path(href).name)
+
+    return BookMetadata(
+        work_title=work_title,
+        book_url=book_url,
+        spine_text_files=spine_text_files,
+    )
+
+
+def rename_ebook_files(downloads_dir: Path) -> None:
+    info("Renaming ebook files: https__kzar-co-uk_ebooks_* -> norman-morgan_*")
+    for source_path in sorted(downloads_dir.iterdir()):
+        if not source_path.is_file():
+            continue
+
+        match = EBOOK_FILENAME_PATTERN.match(source_path.name)
+        if not match:
+            continue
+
+        target_name = f"norman-morgan_{match.group(1)}"
+        target_path = downloads_dir / target_name
+        if target_path.exists():
+            target_path.unlink()
+        source_path.rename(target_path)
+        info(f"  {source_path.name} -> {target_path.name}")
+
+
+def strip_epub_css_properties(css_file: Path) -> None:
+    css = css_file.read_text(encoding="utf-8")
+    css = re.sub(r"\s*-epub-[^;]+?;", "", css)
+    css_file.write_text(css, encoding="utf-8")
+
+
+def prefix_title(xhtml: str, work_title: str) -> str:
+    match = TITLE_RE.search(xhtml)
+    if not match:
+        return xhtml
+
+    current_title = match.group(1)
+    wanted_prefix = f"{work_title} - "
+    if current_title.startswith(wanted_prefix):
+        return xhtml
+
+    return f"{xhtml[:match.start(1)]}{wanted_prefix}{current_title}{xhtml[match.end(1):]}"
+
+
+def ensure_lang_attribute(xhtml: str) -> str:
+    html_tag_match = re.search(r"<html\b[^>]*>", xhtml)
+    if not html_tag_match:
+        return xhtml
+
+    html_tag = html_tag_match.group(0)
+    if 'xml:lang="' not in html_tag:
+        return xhtml
+    if re.search(r'(^|\s)lang="[^"]+"', html_tag):
+        return xhtml
+
+    updated_tag = re.sub(r'xml:lang="([^"]+)"', r'xml:lang="\1" lang="\1"', html_tag, count=1)
+    return f"{xhtml[:html_tag_match.start()]}{updated_tag}{xhtml[html_tag_match.end():]}"
+
+
+def ensure_main_wrapper(xhtml: str) -> str:
+    if not MAIN_TAG_RE.search(xhtml):
+        xhtml = BODY_RE.sub(r"<body\1><main>", xhtml, count=1)
+        xhtml = xhtml.replace("</body>", "</main></body>", 1)
+    return xhtml
+
+
+def ensure_header(xhtml: str, header_html: str) -> str:
+    if "<header><nav>" in xhtml:
+        return xhtml
+
+    return BODY_RE.sub(rf"<body\1>{header_html}", xhtml, count=1)
+
+
+def insert_head_elements(
+    xhtml: str,
+    *,
+    css_hrefs: list[str] | None,
+    canonical_url: str | None,
+) -> str:
+    insertions: list[str] = []
+
+    if css_hrefs:
+        for css_href in css_hrefs:
+            if css_href not in xhtml:
+                insertions.append(
+                    f'<link href="{css_href}" media="screen" rel="stylesheet" type="text/css"/>'
+                )
+
+    if canonical_url and 'rel="canonical"' not in xhtml:
+        insertions.append(f'<link rel="canonical" href="{canonical_url}" />')
+
+    if 'name="viewport"' not in xhtml:
+        insertions.append('<meta content="width=device-width, initial-scale=1" name="viewport"/>')
+
+    if not insertions or "</title>" not in xhtml:
+        return xhtml
+
+    joined = "\n\t\t".join(insertions)
+    return xhtml.replace("</title>", f"</title>\n\t\t{joined}", 1)
+
+
+def adjust_colophon_links(xhtml: str) -> str:
+    return xhtml.replace('<p><a href="http', '<p><a rel="nofollow" href="http')
+
+
+def rewrite_toc_links(xhtml: str) -> str:
+    return re.sub(r'href="text/([^"]+)"', r'href="\1"', xhtml)
+
+
+def extract_page_title(xhtml: str, work_title: str) -> str:
+    match = TITLE_RE.search(xhtml)
+    if not match:
+        return ""
+
+    title = html.unescape(re.sub(r"<[^>]+>", "", match.group(1)).strip())
+    prefix = f"{work_title} - "
+    if title.startswith(prefix):
+        return title[len(prefix) :]
+    return title
+
+
+def inject_footer(xhtml: str, previous_link: str, next_link: str) -> str:
+    footer = f"<footer><ul><li>{previous_link}</li><li>{next_link}</li></ul></footer>"
+    if "<footer><ul><li>" in xhtml:
+        return xhtml
+    return xhtml.replace("</body>", f"{footer}</body>", 1)
+
+
+def canonical_for_text_file(book_url: str | None, filename: str) -> str | None:
+    if not book_url:
+        return None
+
+    if filename == "index.xhtml":
+        return f"{book_url}/text"
+    if filename == "toc.xhtml":
+        return f"{book_url}/text/toc.xhtml"
+    return f"{book_url}/text/{Path(filename).stem}"
+
+
+def create_chapter_footers(text_dir: Path, metadata: BookMetadata) -> None:
+    spine_files = [name for name in metadata.spine_text_files if (text_dir / name).is_file()]
+    if not spine_files:
+        return
+
+    titles: dict[str, str] = {}
+    for filename in spine_files:
+        page = (text_dir / filename).read_text(encoding="utf-8")
+        titles[filename] = extract_page_title(page, metadata.work_title)
+
+    for index, filename in enumerate(spine_files):
+        previous_file = spine_files[index - 1] if index > 0 else None
+        next_file = spine_files[index + 1] if index < len(spine_files) - 1 else None
+
+        previous_link = (
+            f'<a href="{previous_file}" rel="prev"><i>Previous:</i> {html.escape(titles[previous_file])}</a>'
+            if previous_file
+            else ""
+        )
+        next_link = (
+            f'<a href="{next_file}" rel="next"><i>Next:</i> {html.escape(titles[next_file])}</a>'
+            if next_file
+            else ""
+        )
+
+        page_path = text_dir / filename
+        page = page_path.read_text(encoding="utf-8")
+        page = inject_footer(page, previous_link=previous_link, next_link=next_link)
+        page_path.write_text(page, encoding="utf-8")
+
+
+def transform_text_pages(staging_dir: Path, metadata: BookMetadata) -> None:
+    text_dir = staging_dir / "text"
+    header_html = (
+        '<header><nav><ul>'
+        '<li><a href="../">Back to ebook</a></li>'
+        '<li><a href="index.xhtml">Table of contents</a></li>'
+        "</ul></nav></header>"
+    )
+
+    for path in sorted(text_dir.glob("*.xhtml")):
+        page = path.read_text(encoding="utf-8")
+
+        if path.name in {"toc.xhtml", "index.xhtml"}:
+            page = rewrite_toc_links(page)
+
+        page = ensure_lang_attribute(page)
+        page = prefix_title(page, metadata.work_title)
+        page = ensure_main_wrapper(page)
+        page = ensure_header(page, header_html)
+        page = insert_head_elements(
+            page,
+            css_hrefs=["../css/web.css", "../css/web-local.css"],
+            canonical_url=canonical_for_text_file(metadata.book_url, path.name),
+        )
+
+        if path.name == "colophon.xhtml":
+            page = adjust_colophon_links(page)
+
+        path.write_text(page, encoding="utf-8")
+
+
+def transform_single_page(single_page_path: Path, metadata: BookMetadata) -> None:
+    page = single_page_path.read_text(encoding="utf-8")
+    header_html = (
+        '<header><nav><ul>'
+        '<li><a href="../../">Back to ebook</a></li>'
+        "</ul></nav></header>"
+    )
+
+    page = ensure_lang_attribute(page)
+    page = ensure_main_wrapper(page)
+    page = ensure_header(page, header_html)
+    page = insert_head_elements(
+        page,
+        css_hrefs=None,
+        canonical_url=f"{metadata.book_url}/text/single-page" if metadata.book_url else None,
+    )
+    page = adjust_colophon_links(page)
+
+    single_page_path.write_text(page, encoding="utf-8")
+
+
+def build_text_output(
+    source_dir: Path,
+    staging_dir: Path,
+    metadata: BookMetadata,
+    web_css: Path,
+    web_local_css: Path,
+) -> None:
+    src_epub = source_dir / "src" / "epub"
+
+    shutil.copytree(src_epub / "css", staging_dir / "css")
+    shutil.copytree(src_epub / "images", staging_dir / "images")
+    shutil.copytree(src_epub / "text", staging_dir / "text")
+
+    shutil.copy2(src_epub / "toc.xhtml", staging_dir / "text" / "toc.xhtml")
+    shutil.copy2(src_epub / "toc.xhtml", staging_dir / "text" / "index.xhtml")
+
+    for css_file in (staging_dir / "css").glob("*.css"):
+        strip_epub_css_properties(css_file)
+
+    shutil.copy2(web_css, staging_dir / "css" / "web.css")
+    shutil.copy2(web_local_css, staging_dir / "css" / "web-local.css")
+
+    single_page_path = staging_dir / "text" / "single-page" / "index.xhtml"
+    single_page_path.parent.mkdir(parents=True, exist_ok=True)
+    combined_web_css = staging_dir / "css" / "web-single-page.css"
+    combined_web_css.write_text(
+        f"{web_css.read_text(encoding='utf-8')}\n\n{web_local_css.read_text(encoding='utf-8')}\n",
+        encoding="utf-8",
+    )
+
+    run_command(
+        [
+            "se",
+            "recompose-epub",
+            "--xhtml",
+            "--output",
+            str(single_page_path),
+            "--extra-css-file",
+            str(combined_web_css),
+            str(source_dir),
+        ],
+        cwd=source_dir,
+        description="Generating single-page web view",
+    )
+
+    transform_text_pages(staging_dir, metadata)
+    create_chapter_footers(staging_dir / "text", metadata)
+    transform_single_page(single_page_path, metadata)
+
+
+def ensure_tools_installed() -> None:
+    if shutil.which("se") is None:
+        raise RuntimeError("The `se` command is not installed or not on PATH.")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Build downloads/ and text/ web outputs for this book."
+    )
+    parser.add_argument(
+        "output_dir",
+        help="Directory where the static output should be written.",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    script_dir = Path(__file__).resolve().parent
+    source_dir = (script_dir / "..").resolve()
+    output_dir = Path(args.output_dir).resolve()
+    web_css = source_dir / "src" / "web" / "web.css"
+    web_local_css = source_dir / "src" / "web" / "web-local.css"
+
+    if not source_dir.is_dir():
+        raise RuntimeError(f"Source directory does not exist: {source_dir}")
+
+    if not (source_dir / "src" / "epub" / "content.opf").is_file():
+        raise RuntimeError(f"Not a Standard Ebooks source directory: {source_dir}")
+
+    if not web_css.is_file():
+        raise RuntimeError(f"Missing stylesheet: {web_css}")
+    if not web_local_css.is_file():
+        raise RuntimeError(f"Missing stylesheet: {web_local_css}")
+
+    ensure_tools_installed()
+    clear_junk_files(source_dir)
+
+    with tempfile.TemporaryDirectory(prefix="build-release-") as temp_root_raw:
+        staging_dir = Path(temp_root_raw) / "staging"
+        downloads_dir = staging_dir / "downloads"
+        run_command(
+            ["se", "prepare-release", str(source_dir)],
+            cwd=source_dir,
+            description="Updating metadata (dates/revision/word-count)",
+        )
+        metadata = parse_book_metadata(source_dir)
+
+        downloads_dir.mkdir(parents=True, exist_ok=True)
+        run_command(
+            [
+                "se",
+                "build",
+                "--check",
+                "--output-dir",
+                str(downloads_dir),
+                "--kindle",
+                "--kobo",
+                str(source_dir),
+            ],
+            cwd=source_dir,
+            description="Building ebook files",
+        )
+        rename_ebook_files(downloads_dir)
+
+        build_text_output(source_dir, staging_dir, metadata, web_css, web_local_css)
+
+        info(f"Publishing output to {output_dir}")
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        shutil.copytree(staging_dir, output_dir)
+
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except subprocess.CalledProcessError as error:
+        info(f"Command failed with exit code {error.returncode}.")
+        raise SystemExit(error.returncode)
+    except RuntimeError as error:
+        info(f"Error: {error}")
+        raise SystemExit(1)

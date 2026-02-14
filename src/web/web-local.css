@@ -1,0 +1,22 @@
+@namespace epub "http://www.idpf.org/2007/ops";
+
+/* Shrink photos to match column width. */
+main img,
+main svg{
+	height: auto;
+	max-width: 100%;
+}
+
+/* Remove Standard Ebooks logo (since this is self-hosted). */
+body > header li:first-child > a{
+	background: none;
+	display: inline;
+	font-size: inherit;
+	height: auto;
+	width: auto;
+	transition: none;
+	filter: none;
+}
+body > header li:first-child > a:hover{
+	transform: none;
+}
