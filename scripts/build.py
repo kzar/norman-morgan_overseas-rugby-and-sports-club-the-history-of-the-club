@@ -382,6 +382,16 @@ def build_text_output(
     transform_single_page(single_page_path, metadata)
 
 
+def copy_landing_page_assets(
+    staging_dir: Path,
+    *,
+    landing_page: Path,
+    landing_css: Path,
+) -> None:
+    shutil.copy2(landing_page, staging_dir / "index.html")
+    shutil.copy2(landing_css, staging_dir / "css" / "landing.css")
+
+
 def ensure_tools_installed() -> None:
     if shutil.which("se") is None:
         raise RuntimeError("The `se` command is not installed or not on PATH.")
@@ -403,8 +413,10 @@ def main() -> int:
     script_dir = Path(__file__).resolve().parent
     source_dir = (script_dir / "..").resolve()
     output_dir = Path(args.output_dir).resolve()
-    web_css = source_dir / "src" / "web" / "web.css"
-    web_local_css = source_dir / "src" / "web" / "web-local.css"
+    web_css = source_dir / "src" / "web" / "css" / "web.css"
+    web_local_css = source_dir / "src" / "web" / "css" / "web-local.css"
+    landing_page = source_dir / "src" / "web" / "index.html"
+    landing_css = source_dir / "src" / "web" / "css" / "landing.css"
 
     if not source_dir.is_dir():
         raise RuntimeError(f"Source directory does not exist: {source_dir}")
@@ -416,6 +428,10 @@ def main() -> int:
         raise RuntimeError(f"Missing stylesheet: {web_css}")
     if not web_local_css.is_file():
         raise RuntimeError(f"Missing stylesheet: {web_local_css}")
+    if not landing_page.is_file():
+        raise RuntimeError(f"Missing landing page: {landing_page}")
+    if not landing_css.is_file():
+        raise RuntimeError(f"Missing landing stylesheet: {landing_css}")
 
     ensure_tools_installed()
     clear_junk_files(source_dir)
@@ -448,6 +464,11 @@ def main() -> int:
         rename_ebook_files(downloads_dir)
 
         build_text_output(source_dir, staging_dir, metadata, web_css, web_local_css)
+        copy_landing_page_assets(
+            staging_dir,
+            landing_page=landing_page,
+            landing_css=landing_css,
+        )
 
         info(f"Publishing output to {output_dir}")
         if output_dir.exists():

@@ -1,0 +1,97 @@
+body{
+	font-family: serif;
+	line-height: 1.5;
+	margin: 0;
+}
+
+main{
+	max-width: 46rem;
+	margin: 0 auto;
+	padding: 1.5rem 1rem 3rem;
+}
+
+header{
+	border-bottom: 1px solid #ddd;
+	padding-bottom: 1rem;
+	margin-bottom: 1.5rem;
+}
+
+h1{
+	font-size: 1.9rem;
+	line-height: 1.2;
+	margin: 0;
+}
+
+h2{
+	font-size: 1.25rem;
+	margin: 0 0 0.6rem;
+}
+
+p{
+	margin: 0.6rem 0;
+}
+
+figure{
+	margin: 0 0 1.5rem;
+}
+
+figure img{
+	display: block;
+	max-width: 16rem;
+	height: auto;
+	border: 1px solid #ddd;
+}
+
+.intro{
+	display: flex;
+	gap: 1.5rem;
+	align-items: flex-start;
+}
+
+.intro > div{
+	flex: 1;
+}
+
+.intro figure{
+	flex: 0 0 auto;
+	margin: 0;
+}
+
+section{
+	margin-top: 1.75rem;
+}
+
+#about-formats{
+	font-style: italic;
+	margin-top: 1em;
+}
+
+ul{
+	margin: 0.3rem 0 0 1.2rem;
+	padding: 0;
+}
+
+li{
+	margin: 0.35rem 0;
+}
+
+a{
+	color: #133f8f;
+}
+
+a:hover{
+	color: #0d2d66;
+}
+
+footer{
+	margin-top: 2.5rem;
+	padding-top: 1rem;
+	border-top: 1px solid #ddd;
+	font-size: 0.95rem;
+}
+
+@media(max-width: 740px){
+	.intro{
+		flex-direction: column;
+	}
+}
