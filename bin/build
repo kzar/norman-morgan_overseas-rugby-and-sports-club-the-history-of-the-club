@@ -31,6 +31,7 @@ EBOOK_FILENAME_PATTERN = re.compile(r"^https__kzar-co-uk_ebooks_(.+)$")
 TITLE_RE = re.compile(r"<title>(.*?)</title>", re.DOTALL)
 BODY_RE = re.compile(r"<body([^>]*)>", re.DOTALL)
 MAIN_TAG_RE = re.compile(r"<main\b")
+RECENT_CHANGES_MARKER = "<!--RECENT_CHANGES_ITEMS-->"
 
 
 @dataclass(frozen=True)
@@ -133,6 +134,76 @@ def rename_ebook_files(downloads_dir: Path) -> None:
             target_path.unlink()
         source_path.rename(target_path)
         info(f"  {source_path.name} -> {target_path.name}")
+
+
+def parse_github_repo_url(landing_page_html: str) -> str:
+    match = re.search(
+        r'<a href="(https://github\.com/[^"]+)">[^<]*full change history\.</a>',
+        landing_page_html,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        raise RuntimeError("Missing GitHub full change history link in landing page template.")
+
+    repo_url = match.group(1).rstrip("/")
+    return repo_url
+
+
+def recent_commits(source_dir: Path, limit: int) -> list[tuple[str, str, str]]:
+    try:
+        output = subprocess.check_output(
+            [
+                "git",
+                "-C",
+                str(source_dir),
+                "log",
+                f"--max-count={limit}",
+                "--date=format:%b %e, %Y",
+                "--pretty=format:%cd%x1f%H%x1f%s",
+            ],
+            text=True,
+        )
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError("Unable to read git history for recent changes section.") from error
+
+    commits: list[tuple[str, str, str]] = []
+    for line in output.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\x1f", 2)
+        if len(parts) != 3:
+            continue
+        commit_date, commit_hash, commit_subject = parts
+        commits.append((" ".join(commit_date.split()), commit_hash, commit_subject))
+
+    if not commits:
+        raise RuntimeError("No git commits available for recent changes section.")
+
+    return commits
+
+
+def insert_recent_changes(landing_page_path: Path, source_dir: Path) -> None:
+    landing_page_html = landing_page_path.read_text(encoding="utf-8")
+    marker_match = re.search(
+        rf"(?P<indent>[ \t]*){re.escape(RECENT_CHANGES_MARKER)}",
+        landing_page_html,
+    )
+    if not marker_match:
+        raise RuntimeError("Missing recent changes placeholder in landing page template.")
+
+    repo_url = parse_github_repo_url(landing_page_html)
+    commits = recent_commits(source_dir, limit=5)
+    indent = marker_match.group("indent")
+    commit_items = "\n".join(
+        (
+            f'{indent}<li>{html.escape(commit_date)} - '
+            f'<a href="{repo_url}/commit/{commit_hash}">{html.escape(commit_subject)}</a></li>'
+        )
+        for commit_date, commit_hash, commit_subject in commits
+    )
+
+    landing_page_html = landing_page_html.replace(RECENT_CHANGES_MARKER, commit_items, 1)
+    landing_page_path.write_text(landing_page_html, encoding="utf-8")
 
 
 def strip_epub_css_properties(css_file: Path) -> None:
@@ -476,6 +547,7 @@ def main() -> int:
             staging_dir,
             web_dir=web_dir,
         )
+        insert_recent_changes(staging_dir / "index.html", source_dir)
 
         info(f"Publishing output to {output_dir}")
         if output_dir.exists():
