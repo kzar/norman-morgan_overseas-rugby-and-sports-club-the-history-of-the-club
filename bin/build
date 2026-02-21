@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Build release-ready ebook outputs for this repository.
+"""Build the ebook.
 
-Based on Standard Ebooks tooling and deployment workflow:
+Based on the Standard Ebooks tooling:
 - https://github.com/standardebooks/tools
 - https://github.com/standardebooks/web/blob/master/scripts/deploy-ebook-to-www
 """

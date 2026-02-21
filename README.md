@@ -26,7 +26,14 @@ See also:
 
 ```bash
 # Build the ebook files and web version of the book.
-scripts/build.py OUTPUT_PATH
+bin/build OUTPUT_PATH
+```
+
+## Deploying
+
+```bash
+# Build and deploy the ebook to kzar.co.uk.
+bin/deploy
 ```
 
 ## Linting
