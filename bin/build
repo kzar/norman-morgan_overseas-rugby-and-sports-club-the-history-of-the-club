@@ -188,6 +188,7 @@ def insert_head_elements(
     *,
     css_hrefs: list[str] | None,
     canonical_url: str | None,
+    favicon_prefix: str | None = None,
 ) -> str:
     insertions: list[str] = []
 
@@ -200,6 +201,16 @@ def insert_head_elements(
 
     if canonical_url and 'rel="canonical"' not in xhtml:
         insertions.append(f'<link rel="canonical" href="{canonical_url}" />')
+
+    if favicon_prefix:
+        favicon_html = (
+            f'<link rel="shortcut icon" type="image/x-icon" href="{favicon_prefix}favicon.ico"/>\n\t\t'
+            f'<link rel="icon" type="image/webp" sizes="16x16" href="{favicon_prefix}favicon-16x16.webp"/>\n\t\t'
+            f'<link rel="icon" type="image/webp" sizes="32x32" href="{favicon_prefix}favicon-32x32.webp"/>\n\t\t'
+            f'<link rel="icon" type="image/webp" sizes="96x96" href="{favicon_prefix}favicon-96x96.webp"/>'
+        )
+        if f'href="{favicon_prefix}favicon.ico"' not in xhtml:
+            insertions.append(favicon_html)
 
     if 'name="viewport"' not in xhtml:
         insertions.append('<meta content="width=device-width, initial-scale=1" name="viewport"/>')
@@ -303,6 +314,7 @@ def transform_text_pages(staging_dir: Path, metadata: BookMetadata) -> None:
             page,
             css_hrefs=["../css/web.css", "../css/web-local.css"],
             canonical_url=canonical_for_text_file(metadata.book_url, path.name),
+            favicon_prefix="../",
         )
 
         if path.name == "colophon.xhtml":
@@ -326,6 +338,7 @@ def transform_single_page(single_page_path: Path, metadata: BookMetadata) -> Non
         page,
         css_hrefs=None,
         canonical_url=f"{metadata.book_url}/text/single-page" if metadata.book_url else None,
+        favicon_prefix="../../",
     )
     page = adjust_colophon_links(page)
 
@@ -385,11 +398,9 @@ def build_text_output(
 def copy_landing_page_assets(
     staging_dir: Path,
     *,
-    landing_page: Path,
-    landing_css: Path,
+    web_dir: Path,
 ) -> None:
-    shutil.copy2(landing_page, staging_dir / "index.html")
-    shutil.copy2(landing_css, staging_dir / "css" / "landing.css")
+    shutil.copytree(web_dir, staging_dir, dirs_exist_ok=True)
 
 
 def ensure_tools_installed() -> None:
@@ -413,10 +424,9 @@ def main() -> int:
     script_dir = Path(__file__).resolve().parent
     source_dir = (script_dir / "..").resolve()
     output_dir = Path(args.output_dir).resolve()
+    web_dir = source_dir / "src" / "web"
     web_css = source_dir / "src" / "web" / "css" / "web.css"
     web_local_css = source_dir / "src" / "web" / "css" / "web-local.css"
-    landing_page = source_dir / "src" / "web" / "index.html"
-    landing_css = source_dir / "src" / "web" / "css" / "landing.css"
 
     if not source_dir.is_dir():
         raise RuntimeError(f"Source directory does not exist: {source_dir}")
@@ -428,10 +438,8 @@ def main() -> int:
         raise RuntimeError(f"Missing stylesheet: {web_css}")
     if not web_local_css.is_file():
         raise RuntimeError(f"Missing stylesheet: {web_local_css}")
-    if not landing_page.is_file():
-        raise RuntimeError(f"Missing landing page: {landing_page}")
-    if not landing_css.is_file():
-        raise RuntimeError(f"Missing landing stylesheet: {landing_css}")
+    if not web_dir.is_dir():
+        raise RuntimeError(f"Missing web assets directory: {web_dir}")
 
     ensure_tools_installed()
     clear_junk_files(source_dir)
@@ -466,8 +474,7 @@ def main() -> int:
         build_text_output(source_dir, staging_dir, metadata, web_css, web_local_css)
         copy_landing_page_assets(
             staging_dir,
-            landing_page=landing_page,
-            landing_css=landing_css,
+            web_dir=web_dir,
         )
 
         info(f"Publishing output to {output_dir}")
