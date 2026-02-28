@@ -39,11 +39,8 @@ bin/deploy
 ## Linting
 
 ```bash
-# Run the pre-build checks.
-se build -y .
-
-# Lint the code.
-se lint .
+# Run the pre-build and linting checks.
+bin/lint
 ```
 
 ## Documentation

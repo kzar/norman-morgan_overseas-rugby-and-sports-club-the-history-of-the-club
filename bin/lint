@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+
+PROJECT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")/..")"
+TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/overseas-rugby-lint.XXXXXX")"
+BUILD_LOG="${TEMP_DIR}/se-build.log"
+LINT_LOG="${TEMP_DIR}/se-lint.log"
+
+# Copy relevant ebook files to a temporary directory, before running the
+# linting from there. Otherwise, the linter gets confused by some of the files
+# in src/web.
+rsync -a \
+	--delete \
+	--exclude ".git/" \
+	--exclude "src/web/" \
+	--exclude "__pycache__/" \
+	--exclude "*.pyc" \
+	"${PROJECT_DIR}/" \
+	"${TEMP_DIR}/"
+
+echo "Running build checks..."
+echo "  Build log: ${BUILD_LOG}"
+set +e
+(cd "${TEMP_DIR}" && se build --check .) > "${BUILD_LOG}" 2>&1
+build_rc=$?
+set -e
+
+if [[ ${build_rc} -ne 0 ]]; then
+	echo "  (Build check failed. Lint was skipped.)"
+	less -R "${BUILD_LOG}" || true
+	exit "${build_rc}"
+fi
+
+echo "Running lint checks..."
+echo "  Lint log: ${LINT_LOG}"
+set +e
+(cd "${TEMP_DIR}" && se lint .) > "${LINT_LOG}" 2>&1
+lint_rc=$?
+set -e
+
+if [[ ${lint_rc} -ne 0 ]]; then
+	lint_line_count=$(wc -l < "${LINT_LOG}")
+	echo "  (Lint failure output has ${lint_line_count} lines.)"
+fi
+
+less -R "${LINT_LOG}" || true
+exit "${lint_rc}"
