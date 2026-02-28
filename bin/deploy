@@ -2,4 +2,5 @@
 set -euo pipefail
 BUILD_OUTPUT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/overseas-rugby-deploy.XXXXXX")"
 bin/build "${BUILD_OUTPUT_DIR}"
+echo "Deploying to kzar.co.uk..."
 rsync -a --delete "${BUILD_OUTPUT_DIR}/" "kzar@dub.kzar.co.uk:/srv/ebooks/overseas-rugby/"

@@ -33,7 +33,11 @@
 		<meta property="term" refines="#subject-4">sh85056842</meta>
 		<meta property="se:subject">Rugby</meta>
 		<dc:description id="description">The history of the Overseas Rugby and Sports Club in Malta, from its formation in 1946 through to 1982.</dc:description>
-		<meta id="long-description" property="se:long-description" refines="#description">Founded in 1946 by Commodore D. Orr-Ewing and Trevor Lewis, the Overseas Rugby Football Club was the only civilian rugby club in Malta for many years. This history chronicles the club's development from its post-war inception, through the golden years of matches against Royal Navy ships and touring sides, to the challenges faced during the British Forces withdrawal. It includes detailed records of officials, match results, and the social life that made the club a central hub for sportsmen on the island.</meta>
+		<meta id="long-description" property="se:long-description" refines="#description">
+			&lt;p&gt;Founded in 1946 by Commodore D. Orr-Ewing and Trevor Lewis, the Overseas Rugby Football Club was the only civilian rugby club in Malta for many years.&lt;/p&gt;
+			&lt;p&gt;This history chronicles the club’s development from its post-war inception, through the golden years of matches against Royal Navy ships and touring sides, to the challenges faced during the British Forces withdrawal.&lt;/p&gt;
+			&lt;p&gt;It includes detailed records of officials, match results, and the social life that made the club a central hub for sportsmen on the island.&lt;/p&gt;
+		</meta>
 		<dc:language>en-GB</dc:language>
 		<dc:source>https://static.kzar.co.uk/Overseas%20Rugby%20and%20Sports%20Club%20-%20The%20History%20of%20the%20Club.pdf</dc:source>
 		<meta property="se:production-notes">Transcribed from the 1983 edition that includes "The Final Chapter" supplement.</meta>

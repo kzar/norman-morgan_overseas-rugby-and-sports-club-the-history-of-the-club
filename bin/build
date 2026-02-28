@@ -25,19 +25,21 @@ OPF_NS = {
     "dc": "http://purl.org/dc/elements/1.1/",
 }
 
-JUNK_FILE_PATTERNS = ("*~", ".#*", "#*#")
-EBOOK_FILENAME_PATTERN = re.compile(r"^https__kzar-co-uk_ebooks_(.+)$")
+TEMPLATE_TOKEN_RE = re.compile(r"{{\s*([A-Z0-9_]+)\s*}}")
 
 TITLE_RE = re.compile(r"<title>(.*?)</title>", re.DOTALL)
 BODY_RE = re.compile(r"<body([^>]*)>", re.DOTALL)
 MAIN_TAG_RE = re.compile(r"<main\b")
-RECENT_CHANGES_MARKER = "<!--RECENT_CHANGES_ITEMS-->"
 
 
 @dataclass(frozen=True)
 class BookMetadata:
     work_title: str
+    author: str
+    language: str
+    book_description: str
     book_url: str | None
+    github_url: str | None
     spine_text_files: list[str]
 
 
@@ -46,29 +48,16 @@ def info(message: str) -> None:
 
 
 def run_command(command: list[str], cwd: Path, description: str) -> None:
-    info(description + ":")
-    info(f"  {' '.join(shlex.quote(part) for part in command)}")
+    info(description)
     subprocess.run(command, cwd=str(cwd), check=True)
 
 
-def clear_junk_files(source_dir: Path) -> None:
-    artifacts: set[Path] = set()
-    for pattern in JUNK_FILE_PATTERNS:
-        for path in source_dir.rglob(pattern):
-            if not path.is_file():
-                continue
-            relative_parts = path.relative_to(source_dir).parts
-            if ".git" in relative_parts:
-                continue
-            artifacts.add(path)
-
-    if not artifacts:
-        return
-
-    for artifact in sorted(artifacts):
-        artifact.unlink()
-
-    info(f"Removed {len(artifacts)} junk artifact(s).")
+def first_text(root: ET.Element, *xpaths: str, default: str = "") -> str:
+    for xpath in xpaths:
+        value = root.findtext(xpath, namespaces=OPF_NS)
+        if value and value.strip():
+            return value.strip()
+    return default
 
 
 def parse_book_metadata(source_dir: Path) -> BookMetadata:
@@ -76,22 +65,18 @@ def parse_book_metadata(source_dir: Path) -> BookMetadata:
     tree = ET.parse(content_opf)
     root = tree.getroot()
 
-    work_title = (
-        root.findtext(".//dc:title[@id='title']", namespaces=OPF_NS)
-        or root.findtext(".//dc:title", namespaces=OPF_NS)
-        or "Untitled"
-    ).strip()
-
-    raw_identifier = (
-        root.findtext(".//dc:identifier[@id='uid']", namespaces=OPF_NS)
-        or root.findtext(".//dc:identifier", namespaces=OPF_NS)
-        or ""
-    ).strip()
-
-    if raw_identifier.startswith("http://") or raw_identifier.startswith("https://"):
-        book_url = raw_identifier.rstrip("/")
-    else:
-        book_url = None
+    work_title = first_text(root, ".//dc:title[@id='title']", ".//dc:title", default="Untitled")
+    author = first_text(root, ".//dc:creator[@id='author']", ".//dc:creator", default="Unknown")
+    language = first_text(root, ".//dc:language", default="en")
+    book_description = first_text(
+        root,
+        ".//opf:meta[@property='se:long-description']",
+        ".//dc:description",
+        default="Description coming soon.",
+    )
+    github_url = first_text(root, ".//opf:meta[@property='se:url.vcs.github']") or None
+    raw_identifier = first_text(root, ".//dc:identifier[@id='uid']", ".//dc:identifier")
+    book_url = raw_identifier.rstrip("/") if raw_identifier.startswith(("http://", "https://")) else None
 
     manifest_by_id: dict[str, str] = {}
     for item in root.findall(".//opf:manifest/opf:item", OPF_NS):
@@ -113,40 +98,51 @@ def parse_book_metadata(source_dir: Path) -> BookMetadata:
 
     return BookMetadata(
         work_title=work_title,
+        author=author,
+        language=language,
+        book_description=book_description,
         book_url=book_url,
+        github_url=github_url,
         spine_text_files=spine_text_files,
     )
 
 
-def rename_ebook_files(downloads_dir: Path) -> None:
-    info("Renaming ebook files: https__kzar-co-uk_ebooks_* -> norman-morgan_*")
-    for source_path in sorted(downloads_dir.iterdir()):
+def slugify(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug or "book"
+
+
+def rename_ebook_files(downloads_dir: Path, metadata: BookMetadata) -> str:
+    author_slug = slugify(metadata.author)
+    target_prefix = f"{author_slug}_"
+    renamed = 0
+    for source_path in sorted(downloads_dir.glob("*_ebooks_*")):
         if not source_path.is_file():
             continue
 
-        match = EBOOK_FILENAME_PATTERN.match(source_path.name)
-        if not match:
+        _, separator, suffix = source_path.name.partition("_ebooks_")
+        if not separator:
             continue
 
-        target_name = f"norman-morgan_{match.group(1)}"
+        target_name = f"{target_prefix}{suffix}"
         target_path = downloads_dir / target_name
         if target_path.exists():
             target_path.unlink()
         source_path.rename(target_path)
-        info(f"  {source_path.name} -> {target_path.name}")
+        renamed += 1
 
+    if renamed == 0:
+        raise RuntimeError("No ebook files matching '*_ebooks_*' were produced.")
 
-def parse_github_repo_url(landing_page_html: str) -> str:
-    match = re.search(
-        r'<a href="(https://github\.com/[^"]+)">[^<]*full change history\.</a>',
-        landing_page_html,
-        flags=re.IGNORECASE,
-    )
-    if not match:
-        raise RuntimeError("Missing GitHub full change history link in landing page template.")
+    epub_bases = [
+        path.name.removesuffix(".epub")
+        for path in sorted(downloads_dir.glob(f"{author_slug}_*.epub"))
+        if path.is_file() and not path.name.endswith((".kepub.epub", "_advanced.epub"))
+    ]
+    if len(epub_bases) != 1:
+        raise RuntimeError("Could not infer exactly one compatible .epub filename after renaming.")
 
-    repo_url = match.group(1).rstrip("/")
-    return repo_url
+    return epub_bases[0]
 
 
 def recent_commits(source_dir: Path, limit: int) -> list[tuple[str, str, str]]:
@@ -176,34 +172,53 @@ def recent_commits(source_dir: Path, limit: int) -> list[tuple[str, str, str]]:
         commit_date, commit_hash, commit_subject = parts
         commits.append((" ".join(commit_date.split()), commit_hash, commit_subject))
 
-    if not commits:
-        raise RuntimeError("No git commits available for recent changes section.")
-
     return commits
 
 
-def insert_recent_changes(landing_page_path: Path, source_dir: Path) -> None:
-    landing_page_html = landing_page_path.read_text(encoding="utf-8")
-    marker_match = re.search(
-        rf"(?P<indent>[ \t]*){re.escape(RECENT_CHANGES_MARKER)}",
-        landing_page_html,
-    )
-    if not marker_match:
-        raise RuntimeError("Missing recent changes placeholder in landing page template.")
-
-    repo_url = parse_github_repo_url(landing_page_html)
+def render_landing_page(
+    landing_page_path: Path,
+    *,
+    metadata: BookMetadata,
+    source_dir: Path,
+    download_file_basename: str,
+) -> None:
     commits = recent_commits(source_dir, limit=5)
-    indent = marker_match.group("indent")
-    commit_items = "\n".join(
-        (
-            f'{indent}<li>{html.escape(commit_date)} - '
-            f'<a href="{repo_url}/commit/{commit_hash}">{html.escape(commit_subject)}</a></li>'
-        )
-        for commit_date, commit_hash, commit_subject in commits
+    github_url = metadata.github_url or "https://github.com/standardebooks/tools"
+    commit_url_prefix = (
+        f'{html.escape(metadata.github_url, quote=True)}/commit/' if metadata.github_url else None
     )
+    recent_changes_items = "\n".join(
+        (
+            f"<li>{html.escape(commit_date)} - "
+            f'<a href="{commit_url_prefix}{commit_hash}">{html.escape(commit_subject)}</a></li>'
+        )
+        if commit_url_prefix
+        else f"<li>{html.escape(commit_date)} - {html.escape(commit_subject)}</li>"
+        for commit_date, commit_hash, commit_subject in commits
+    ) or "<li>No recent commits found.</li>"
 
-    landing_page_html = landing_page_html.replace(RECENT_CHANGES_MARKER, commit_items, 1)
-    landing_page_path.write_text(landing_page_html, encoding="utf-8")
+    template = landing_page_path.read_text(encoding="utf-8")
+    rendered = template
+    for key, value in {
+        "BOOK_LANGUAGE": html.escape(metadata.language),
+        "BOOK_TITLE": html.escape(metadata.work_title),
+        "BOOK_AUTHOR": html.escape(metadata.author),
+        "META_DESCRIPTION": html.escape(
+            f"Read and download {metadata.work_title} by {metadata.author}.",
+            quote=True,
+        ),
+        "BOOK_DESCRIPTION": html.unescape(metadata.book_description),
+        "DOWNLOAD_FILE_BASENAME": html.escape(download_file_basename, quote=True),
+        "RECENT_CHANGES_ITEMS": recent_changes_items,
+        "GITHUB_REPO_URL": html.escape(github_url, quote=True),
+    }.items():
+        rendered = rendered.replace(f"{{{{ {key} }}}}", value)
+
+    unresolved = sorted(set(TEMPLATE_TOKEN_RE.findall(rendered)))
+    if unresolved:
+        raise RuntimeError(f"Unresolved template token(s): {', '.join(unresolved)}")
+
+    landing_page_path.write_text(rendered, encoding="utf-8")
 
 
 def strip_epub_css_properties(css_file: Path) -> None:
@@ -248,9 +263,6 @@ def ensure_main_wrapper(xhtml: str) -> str:
 
 
 def ensure_header(xhtml: str, header_html: str) -> str:
-    if "<header><nav>" in xhtml:
-        return xhtml
-
     return BODY_RE.sub(rf"<body\1>{header_html}", xhtml, count=1)
 
 
@@ -261,33 +273,27 @@ def insert_head_elements(
     canonical_url: str | None,
     favicon_prefix: str | None = None,
 ) -> str:
-    insertions: list[str] = []
-
-    if css_hrefs:
-        for css_href in css_hrefs:
-            if css_href not in xhtml:
-                insertions.append(
-                    f'<link href="{css_href}" media="screen" rel="stylesheet" type="text/css"/>'
-                )
-
-    if canonical_url and 'rel="canonical"' not in xhtml:
-        insertions.append(f'<link rel="canonical" href="{canonical_url}" />')
-
-    if favicon_prefix:
-        favicon_html = (
-            f'<link rel="shortcut icon" type="image/x-icon" href="{favicon_prefix}favicon.ico"/>\n\t\t'
-            f'<link rel="icon" type="image/webp" sizes="16x16" href="{favicon_prefix}favicon-16x16.webp"/>\n\t\t'
-            f'<link rel="icon" type="image/webp" sizes="32x32" href="{favicon_prefix}favicon-32x32.webp"/>\n\t\t'
-            f'<link rel="icon" type="image/webp" sizes="96x96" href="{favicon_prefix}favicon-96x96.webp"/>'
-        )
-        if f'href="{favicon_prefix}favicon.ico"' not in xhtml:
-            insertions.append(favicon_html)
-
-    if 'name="viewport"' not in xhtml:
-        insertions.append('<meta content="width=device-width, initial-scale=1" name="viewport"/>')
-
-    if not insertions or "</title>" not in xhtml:
+    if "</title>" not in xhtml:
         return xhtml
+
+    insertions: list[str] = []
+    if css_hrefs:
+        insertions.extend(
+            f'<link href="{css_href}" media="screen" rel="stylesheet" type="text/css"/>'
+            for css_href in css_hrefs
+        )
+    if canonical_url:
+        insertions.append(f'<link rel="canonical" href="{canonical_url}" />')
+    if favicon_prefix:
+        insertions.extend(
+            [
+                f'<link rel="shortcut icon" type="image/x-icon" href="{favicon_prefix}favicon.ico"/>',
+                f'<link rel="icon" type="image/webp" sizes="16x16" href="{favicon_prefix}favicon-16x16.webp"/>',
+                f'<link rel="icon" type="image/webp" sizes="32x32" href="{favicon_prefix}favicon-32x32.webp"/>',
+                f'<link rel="icon" type="image/webp" sizes="96x96" href="{favicon_prefix}favicon-96x96.webp"/>',
+            ]
+        )
+    insertions.append('<meta content="width=device-width, initial-scale=1" name="viewport"/>')
 
     joined = "\n\t\t".join(insertions)
     return xhtml.replace("</title>", f"</title>\n\t\t{joined}", 1)
@@ -315,8 +321,6 @@ def extract_page_title(xhtml: str, work_title: str) -> str:
 
 def inject_footer(xhtml: str, previous_link: str, next_link: str) -> str:
     footer = f"<footer><ul><li>{previous_link}</li><li>{next_link}</li></ul></footer>"
-    if "<footer><ul><li>" in xhtml:
-        return xhtml
     return xhtml.replace("</body>", f"{footer}</body>", 1)
 
 
@@ -362,58 +366,35 @@ def create_chapter_footers(text_dir: Path, metadata: BookMetadata) -> None:
         page_path.write_text(page, encoding="utf-8")
 
 
-def transform_text_pages(staging_dir: Path, metadata: BookMetadata) -> None:
-    text_dir = staging_dir / "text"
-    header_html = (
-        '<header><nav><ul>'
-        '<li><a href="../">Back to ebook</a></li>'
-        '<li><a href="index.xhtml">Table of contents</a></li>'
-        "</ul></nav></header>"
-    )
-
-    for path in sorted(text_dir.glob("*.xhtml")):
-        page = path.read_text(encoding="utf-8")
-
-        if path.name in {"toc.xhtml", "index.xhtml"}:
-            page = rewrite_toc_links(page)
-
-        page = ensure_lang_attribute(page)
-        page = prefix_title(page, metadata.work_title)
-        page = ensure_main_wrapper(page)
-        page = ensure_header(page, header_html)
-        page = insert_head_elements(
-            page,
-            css_hrefs=["../css/web.css", "../css/web-local.css"],
-            canonical_url=canonical_for_text_file(metadata.book_url, path.name),
-            favicon_prefix="../",
-        )
-
-        if path.name == "colophon.xhtml":
-            page = adjust_colophon_links(page)
-
-        path.write_text(page, encoding="utf-8")
-
-
-def transform_single_page(single_page_path: Path, metadata: BookMetadata) -> None:
-    page = single_page_path.read_text(encoding="utf-8")
-    header_html = (
-        '<header><nav><ul>'
-        '<li><a href="../../">Back to ebook</a></li>'
-        "</ul></nav></header>"
-    )
-
+def transform_page(
+    page_path: Path,
+    metadata: BookMetadata,
+    *,
+    header_html: str,
+    css_hrefs: list[str] | None,
+    canonical_url: str | None,
+    favicon_prefix: str | None,
+    rewrite_toc: bool = False,
+    add_title_prefix: bool = True,
+    adjust_colophon: bool = False,
+) -> None:
+    page = page_path.read_text(encoding="utf-8")
+    if rewrite_toc:
+        page = rewrite_toc_links(page)
     page = ensure_lang_attribute(page)
+    if add_title_prefix:
+        page = prefix_title(page, metadata.work_title)
     page = ensure_main_wrapper(page)
     page = ensure_header(page, header_html)
     page = insert_head_elements(
         page,
-        css_hrefs=None,
-        canonical_url=f"{metadata.book_url}/text/single-page" if metadata.book_url else None,
-        favicon_prefix="../../",
+        css_hrefs=css_hrefs,
+        canonical_url=canonical_url,
+        favicon_prefix=favicon_prefix,
     )
-    page = adjust_colophon_links(page)
-
-    single_page_path.write_text(page, encoding="utf-8")
+    if adjust_colophon:
+        page = adjust_colophon_links(page)
+    page_path.write_text(page, encoding="utf-8")
 
 
 def build_text_output(
@@ -458,25 +439,39 @@ def build_text_output(
             str(source_dir),
         ],
         cwd=source_dir,
-        description="Generating single-page web view",
+        description="Generating single-page web view...",
     )
 
-    transform_text_pages(staging_dir, metadata)
+    text_header_html = (
+        '<header><nav><ul>'
+        '<li><a href="../">Back to ebook</a></li>'
+        '<li><a href="index.xhtml">Table of contents</a></li>'
+        "</ul></nav></header>"
+    )
+    for path in sorted((staging_dir / "text").glob("*.xhtml")):
+        transform_page(
+            path,
+            metadata,
+            header_html=text_header_html,
+            css_hrefs=["../css/web.css", "../css/web-local.css"],
+            canonical_url=canonical_for_text_file(metadata.book_url, path.name),
+            favicon_prefix="../",
+            rewrite_toc=path.name in {"toc.xhtml", "index.xhtml"},
+            add_title_prefix=True,
+            adjust_colophon=path.name == "colophon.xhtml",
+        )
+
     create_chapter_footers(staging_dir / "text", metadata)
-    transform_single_page(single_page_path, metadata)
-
-
-def copy_landing_page_assets(
-    staging_dir: Path,
-    *,
-    web_dir: Path,
-) -> None:
-    shutil.copytree(web_dir, staging_dir, dirs_exist_ok=True)
-
-
-def ensure_tools_installed() -> None:
-    if shutil.which("se") is None:
-        raise RuntimeError("The `se` command is not installed or not on PATH.")
+    transform_page(
+        single_page_path,
+        metadata,
+        header_html='<header><nav><ul><li><a href="../../">Back to ebook</a></li></ul></nav></header>',
+        css_hrefs=None,
+        canonical_url=f"{metadata.book_url}/text/single-page" if metadata.book_url else None,
+        favicon_prefix="../../",
+        add_title_prefix=False,
+        adjust_colophon=True,
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -512,8 +507,8 @@ def main() -> int:
     if not web_dir.is_dir():
         raise RuntimeError(f"Missing web assets directory: {web_dir}")
 
-    ensure_tools_installed()
-    clear_junk_files(source_dir)
+    if shutil.which("se") is None:
+        raise RuntimeError("The `se` command is not installed or not on PATH.")
 
     with tempfile.TemporaryDirectory(prefix="build-release-") as temp_root_raw:
         staging_dir = Path(temp_root_raw) / "staging"
@@ -521,7 +516,7 @@ def main() -> int:
         run_command(
             ["se", "prepare-release", str(source_dir)],
             cwd=source_dir,
-            description="Updating metadata (dates/revision/word-count)",
+            description="Updating metadata (dates/revision/word-count)...",
         )
         metadata = parse_book_metadata(source_dir)
 
@@ -538,18 +533,20 @@ def main() -> int:
                 str(source_dir),
             ],
             cwd=source_dir,
-            description="Building ebook files",
+            description="Building ebook files...",
         )
-        rename_ebook_files(downloads_dir)
+        download_file_basename = rename_ebook_files(downloads_dir, metadata)
 
         build_text_output(source_dir, staging_dir, metadata, web_css, web_local_css)
-        copy_landing_page_assets(
-            staging_dir,
-            web_dir=web_dir,
+        shutil.copytree(web_dir, staging_dir, dirs_exist_ok=True)
+        render_landing_page(
+            staging_dir / "index.html",
+            metadata=metadata,
+            source_dir=source_dir,
+            download_file_basename=download_file_basename,
         )
-        insert_recent_changes(staging_dir / "index.html", source_dir)
 
-        info(f"Publishing output to {output_dir}")
+        info(f"Saving output to {output_dir}")
         if output_dir.exists():
             shutil.rmtree(output_dir)
         shutil.copytree(staging_dir, output_dir)
