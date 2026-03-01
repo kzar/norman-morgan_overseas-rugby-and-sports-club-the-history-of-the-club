@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<se-lint-ignore>
+	<file path="*.xhtml">
+		<ignore>
+			<code>t-002</code>
+			<reason>British punctuation style allows commas and periods outside closing quotation marks when they are not part of the quoted text.</reason>
+		</ignore>
+		<ignore>
+			<code>y-013</code>
+			<reason>British punctuation style allows punctuation to appear outside closing quotes when not part of the quotation itself.</reason>
+		</ignore>
+	</file>
+</se-lint-ignore>

@@ -53,11 +53,11 @@
 		<meta property="role" refines="#artist" scheme="marc:relators">art</meta>
 		<dc:contributor id="transcriber-1">Dave Vandyke</dc:contributor>
 		<meta property="file-as" refines="#transcriber-1">Vandyke, Dave</meta>
-		<meta property="se:url.homepage" refines="#transcriber-1">https://kzar.co.uk</meta>
+		<meta property="se:url.homepage" refines="#transcriber-1">https://kzar.co.uk/</meta>
 		<meta property="role" refines="#transcriber-1" scheme="marc:relators">trc</meta>
 		<dc:contributor id="producer-1">Dave Vandyke</dc:contributor>
 		<meta property="file-as" refines="#producer-1">Vandyke, Dave</meta>
-		<meta property="se:url.homepage" refines="#producer-1">https://kzar.co.uk</meta>
+		<meta property="se:url.homepage" refines="#producer-1">https://kzar.co.uk/</meta>
 		<meta property="role" refines="#producer-1" scheme="marc:relators">bkp</meta>
 		<meta property="role" refines="#producer-1" scheme="marc:relators">blw</meta>
 		<meta property="role" refines="#producer-1" scheme="marc:relators">cov</meta>
