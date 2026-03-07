@@ -41,7 +41,7 @@
 		<dc:language>en-GB</dc:language>
 		<dc:source>https://static.kzar.co.uk/Overseas%20Rugby%20and%20Sports%20Club%20-%20The%20History%20of%20the%20Club.pdf</dc:source>
 		<meta property="se:production-notes">Transcribed from the 1983 edition that includes "The Final Chapter" supplement.</meta>
-		<meta property="se:word-count">93857</meta>
+		<meta property="se:word-count">93539</meta>
 		<meta property="se:url.encyclopedia.wikipedia">https://en.wikipedia.org/wiki/Overseas_RUFC</meta>
 		<meta property="se:url.vcs.github">https://github.com/kzar/norman-morgan_overseas-rugby-and-sports-club-the-history-of-the-club</meta>
 		<dc:creator id="author">Norman Morgan</dc:creator>
