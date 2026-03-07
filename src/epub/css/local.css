@@ -108,6 +108,19 @@ table.elected-officials th{
 	width: 40%;
 }
 
+table.match-results th,
+table.match-results td,
+table.match-results-cricket th,
+table.match-results-cricket td,
+table.match-results-rugby th,
+table.match-results-rugby td,
+table.numeric th,
+table.numeric td,
+table.playing-record th,
+table.playing-record td{
+	font-variant-numeric: tabular-nums;
+}
+
 table.playing-record th,
 table.playing-record td{
 	text-align: center;
