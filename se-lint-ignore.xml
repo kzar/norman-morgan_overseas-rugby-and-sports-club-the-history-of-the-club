@@ -10,4 +10,10 @@
 			<reason>British punctuation style allows punctuation to appear outside closing quotes when not part of the quotation itself.</reason>
 		</ignore>
 	</file>
+	<file path="chapter-1.xhtml">
+		<ignore>
+			<code>s-023</code>
+			<reason>Keep the lowercase plural suffix in "XVs"; the roman numeral is XV and the trailing s is not part of the numeral.</reason>
+		</ignore>
+	</file>
 </se-lint-ignore>
