@@ -130,3 +130,67 @@ table.playing-record td{
 [epub|type~="z3998:acronym"]{
 	font-variant: all-small-caps;
 }
+
+/* Photographs and their captions */
+figure{
+	break-inside: avoid;
+	margin: 1em 0;
+}
+
+figcaption{
+	font-size: smaller;
+	font-style: italic;
+	overflow-wrap: break-word;
+	text-align: center;
+}
+
+figcaption p{
+	text-indent: 0;
+}
+
+figcaption .photo-title{
+	font-size: 1.1em;
+	font-style: normal;
+	font-weight: bold;
+}
+
+figcaption .photo-subtitle{
+	font-style: normal;
+	font-weight: bold;
+}
+
+figcaption dl{
+	font-style: normal;
+	margin: 0 auto 1em;
+	max-width: 100%;
+	text-align: left;
+	width: fit-content;
+}
+
+figcaption dt{
+	clear: left;
+	float: left;
+	font-style: italic;
+	font-weight: normal;
+	width: 5em;
+}
+
+figcaption dd{
+	margin: 0 0 .5em 6em;
+	min-height: 1.5em;
+}
+
+figcaption .unknown-person{
+	margin: 0 .5em;
+}
+
+@media(max-width: 30em){
+	figcaption dt{
+		float: none;
+		width: auto;
+	}
+
+	figcaption dd{
+		margin-left: 1em;
+	}
+}
