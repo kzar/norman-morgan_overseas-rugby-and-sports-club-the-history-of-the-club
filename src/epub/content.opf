@@ -51,6 +51,9 @@
 		<dc:contributor id="artist">M. Holland</dc:contributor>
 		<meta property="file-as" refines="#artist">Holland, M.</meta>
 		<meta property="role" refines="#artist" scheme="marc:relators">art</meta>
+		<dc:contributor id="contributor-1">Chris Barker</dc:contributor>
+		<meta property="file-as" refines="#contributor-1">Barker, Chris</meta>
+		<meta property="role" refines="#contributor-1" scheme="marc:relators">ctb</meta>
 		<dc:contributor id="transcriber-1">Dave Vandyke</dc:contributor>
 		<meta property="file-as" refines="#transcriber-1">Vandyke, Dave</meta>
 		<meta property="se:url.homepage" refines="#transcriber-1">https://kzar.co.uk/</meta>
